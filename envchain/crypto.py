@@ -8,11 +8,11 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 SALT_SIZE = 16
 NONCE_SIZE = 12
-KEY_SIZE = 32  # AES-256
+KEY_SIZE = 32  # 256-bit
 
 
 def derive_key(password: str, salt: bytes) -> bytes:
-    """Derive a 256-bit key from a password using PBKDF2-HMAC-SHA256."""
+    """Derive a 256-bit key from a password and salt using PBKDF2."""
     return hashlib.pbkdf2_hmac(
         "sha256",
         password.encode("utf-8"),
@@ -29,29 +29,17 @@ def encrypt(plaintext: str, password: str) -> str:
     key = derive_key(password, salt)
     aesgcm = AESGCM(key)
     ciphertext = aesgcm.encrypt(nonce, plaintext.encode("utf-8"), None)
-    blob = salt + nonce + ciphertext
-    return base64.urlsafe_b64encode(blob).decode("utf-8")
+    token = salt + nonce + ciphertext
+    return base64.b64encode(token).decode("utf-8")
 
 
 def decrypt(token: str, password: str) -> str:
     """Decrypt a base64-encoded token with a password. Returns plaintext."""
-    try:
-        blob = base64.urlsafe_b64decode(token.encode("utf-8"))
-    except Exception as exc:
-        raise ValueError("Invalid token format.") from exc
-
-    if len(blob) < SALT_SIZE + NONCE_SIZE + 16:
-        raise ValueError("Token is too short to be valid.")
-
-    salt = blob[:SALT_SIZE]
-    nonce = blob[SALT_SIZE:SALT_SIZE + NONCE_SIZE]
-    ciphertext = blob[SALT_SIZE + NONCE_SIZE:]
-
+    raw = base64.b64decode(token.encode("utf-8"))
+    salt = raw[:SALT_SIZE]
+    nonce = raw[SALT_SIZE:SALT_SIZE + NONCE_SIZE]
+    ciphertext = raw[SALT_SIZE + NONCE_SIZE:]
     key = derive_key(password, salt)
     aesgcm = AESGCM(key)
-    try:
-        plaintext = aesgcm.decrypt(nonce, ciphertext, None)
-    except Exception as exc:
-        raise ValueError("Decryption failed. Wrong password or corrupted data.") from exc
-
+    plaintext = aesgcm.decrypt(nonce, ciphertext, None)
     return plaintext.decode("utf-8")

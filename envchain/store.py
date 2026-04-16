@@ -1,54 +1,50 @@
 """Persistent storage for encrypted envchain chains."""
 
 import json
+import os
 from pathlib import Path
 from typing import Dict, Optional
 
 DEFAULT_STORE_PATH = Path.home() / ".envchain" / "store.json"
 
 
-class ChainStore:
-    """JSON-backed store for encrypted environment variable chains."""
+def _load_store(store_path: Path) -> Dict:
+    if not store_path.exists():
+        return {}
+    with store_path.open("r") as f:
+        return json.load(f)
 
-    def __init__(self, store_path: Path = DEFAULT_STORE_PATH) -> None:
-        self.store_path = store_path
-        self._data: Dict[str, Dict[str, str]] = {}
-        self._load()
 
-    def _load(self) -> None:
-        if self.store_path.exists():
-            with self.store_path.open("r", encoding="utf-8") as fh:
-                self._data = json.load(fh)
-        else:
-            self._data = {}
+def _save_store(data: Dict, store_path: Path) -> None:
+    store_path.parent.mkdir(parents=True, exist_ok=True)
+    with store_path.open("w") as f:
+        json.dump(data, f, indent=2)
+    os.chmod(store_path, 0o600)
 
-    def _save(self) -> None:
-        self.store_path.parent.mkdir(parents=True, exist_ok=True)
-        with self.store_path.open("w", encoding="utf-8") as fh:
-            json.dump(self._data, fh, indent=2)
 
-    def list_chains(self):
-        return list(self._data.keys())
+def save_chain(chain_name: str, encrypted_vars: Dict[str, str], store_path: Path = DEFAULT_STORE_PATH) -> None:
+    """Save an encrypted variable chain to the store."""
+    data = _load_store(store_path)
+    data[chain_name] = encrypted_vars
+    _save_store(data, store_path)
 
-    def get_chain(self, chain: str) -> Optional[Dict[str, str]]:
-        return self._data.get(chain)
 
-    def set_var(self, chain: str, key: str, encrypted_value: str) -> None:
-        self._data.setdefault(chain, {})[key] = encrypted_value
-        self._save()
+def load_chain(chain_name: str, store_path: Path = DEFAULT_STORE_PATH) -> Optional[Dict[str, str]]:
+    """Load an encrypted variable chain from the store."""
+    data = _load_store(store_path)
+    return data.get(chain_name)
 
-    def delete_var(self, chain: str, key: str) -> bool:
-        if chain in self._data and key in self._data[chain]:
-            del self._data[chain][key]
-            if not self._data[chain]:
-                del self._data[chain]
-            self._save()
-            return True
+
+def list_chains(store_path: Path = DEFAULT_STORE_PATH):
+    """Return all chain names in the store."""
+    return list(_load_store(store_path).keys())
+
+
+def delete_chain(chain_name: str, store_path: Path = DEFAULT_STORE_PATH) -> bool:
+    """Delete a chain from the store. Returns True if deleted."""
+    data = _load_store(store_path)
+    if chain_name not in data:
         return False
-
-    def delete_chain(self, chain: str) -> bool:
-        if chain in self._data:
-            del self._data[chain]
-            self._save()
-            return True
-        return False
+    del data[chain_name]
+    _save_store(data, store_path)
+    return True
