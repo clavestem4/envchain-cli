@@ -41,3 +41,15 @@ def test_encrypt_unicode():
     plaintext = "пароль=секрет"
     token = encrypt(plaintext, "pass")
     assert decrypt(token, "pass") == plaintext
+
+
+def test_decrypt_tampered_token_raises():
+    """Modifying the token after encryption should cause decryption to fail."""
+    import base64
+
+    token = encrypt("sensitive", "password")
+    raw = bytearray(base64.urlsafe_b64decode(token + "=="))
+    raw[-1] ^= 0xFF  # flip bits in the last byte (ciphertext/tag area)
+    tampered = base64.urlsafe_b64encode(bytes(raw)).rstrip(b"=").decode()
+    with pytest.raises(InvalidTag):
+        decrypt(tampered, "password")
