@@ -34,6 +34,12 @@ def test_render_template_missing_loose(mock_get_chain):
     assert "$MISSING" in result
 
 
+def test_render_template_no_substitutions(mock_get_chain):
+    """Template with no variables should be returned unchanged."""
+    result = render_template("no variables here", "mychain", "pass")
+    assert result == "no variables here"
+
+
 def test_render_template_file(mock_get_chain, tmp_path):
     tpl = tmp_path / "tmpl.txt"
     tpl.write_text("host=$HOST port=$PORT")
@@ -78,5 +84,15 @@ def test_cli_render_no_options_error(runner, mock_get_chain):
     result = runner.invoke(
         template_group,
         ["render", "mychain", "--password", "pass"],
+    )
+    assert result.exit_code != 0
+
+
+def test_cli_render_missing_file_error(runner, mock_get_chain, tmp_path):
+    """Rendering a non-existent file should result in a non-zero exit code."""
+    missing = tmp_path / "nonexistent.txt"
+    result = runner.invoke(
+        template_group,
+        ["render", "mychain", "--password", "pass", "--file", str(missing)],
     )
     assert result.exit_code != 0
