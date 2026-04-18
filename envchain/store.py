@@ -48,3 +48,18 @@ def delete_chain(chain_name: str, store_path: Path = DEFAULT_STORE_PATH) -> bool
     del data[chain_name]
     _save_store(data, store_path)
     return True
+
+
+def rename_chain(old_name: str, new_name: str, store_path: Path = DEFAULT_STORE_PATH) -> bool:
+    """Rename a chain in the store. Returns True if renamed, False if old_name not found.
+
+    Raises ValueError if new_name already exists in the store.
+    """
+    data = _load_store(store_path)
+    if old_name not in data:
+        return False
+    if new_name in data:
+        raise ValueError(f"Chain '{new_name}' already exists.")
+    data[new_name] = data.pop(old_name)
+    _save_store(data, store_path)
+    return True
