@@ -27,6 +27,13 @@ def test_set_note(mock_chain_fns):
     assert mock_chain_fns["mychain"][_NOTES_KEY] == "This is a test chain"
 
 
+def test_set_note_preserves_existing_vars(mock_chain_fns):
+    """Setting a note should not remove other env vars in the chain."""
+    set_note("mychain", "my note", "pass")
+    assert mock_chain_fns["mychain"]["FOO"] == "bar"
+    assert mock_chain_fns["mychain"][_NOTES_KEY] == "my note"
+
+
 def test_get_note(mock_chain_fns):
     mock_chain_fns["mychain"][_NOTES_KEY] = "hello"
     result = get_note("mychain", "pass")
@@ -42,6 +49,13 @@ def test_clear_note(mock_chain_fns):
     mock_chain_fns["mychain"][_NOTES_KEY] = "to be removed"
     clear_note("mychain", "pass")
     assert _NOTES_KEY not in mock_chain_fns["mychain"]
+
+
+def test_clear_note_preserves_existing_vars(mock_chain_fns):
+    """Clearing a note should not remove other env vars in the chain."""
+    mock_chain_fns["mychain"][_NOTES_KEY] = "to be removed"
+    clear_note("mychain", "pass")
+    assert mock_chain_fns["mychain"]["FOO"] == "bar"
 
 
 def test_set_note_missing_chain(mock_chain_fns):
