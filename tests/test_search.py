@@ -87,3 +87,10 @@ def test_search_all_only_variable():
     assert len(results) == 1
     assert results[0]["chain"] == "frontend"
     assert results[0]["match"] == "variable"
+
+
+def test_search_all_returns_each_chain_once():
+    """Ensure search_all never returns duplicate entries for the same chain."""
+    results = search_all("pass", "api")
+    chain_names = [r["chain"] for r in results]
+    assert len(chain_names) == len(set(chain_names)), "Duplicate chain entries found in search_all results"
