@@ -11,6 +11,11 @@ def tmp_hist(tmp_path):
     return str(tmp_path / "history.json")
 
 
+@pytest.fixture
+def runner():
+    return CliRunner()
+
+
 def test_record_event_creates_entry(tmp_hist):
     event = record_event("mychain", "add", variable="API_KEY", history_file=tmp_hist)
     assert event["chain"] == "mychain"
@@ -42,6 +47,17 @@ def test_get_history_filter_action(tmp_hist):
     assert events[0]["action"] == "delete"
 
 
+def test_get_history_filter_chain_and_action(tmp_hist):
+    """Filtering by both chain and action should narrow results correctly."""
+    record_event("a", "add", variable="X", history_file=tmp_hist)
+    record_event("a", "delete", variable="X", history_file=tmp_hist)
+    record_event("b", "add", variable="Y", history_file=tmp_hist)
+    events = get_history(chain="a", action="add", history_file=tmp_hist)
+    assert len(events) == 1
+    assert events[0]["chain"] == "a"
+    assert events[0]["action"] == "add"
+
+
 def test_clear_history_all(tmp_hist):
     record_event("a", "add", history_file=tmp_hist)
     record_event("b", "add", history_file=tmp_hist)
@@ -65,10 +81,6 @@ def test_get_history_empty(tmp_hist):
 
 
 # CLI tests
-
-@pytest.fixture
-def runner():
-    return CliRunner()
 
 
 def test_cli_history_log_empty(runner, tmp_path, monkeypatch):
