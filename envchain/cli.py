@@ -1,77 +1,81 @@
 """Main CLI entry point for envchain."""
-
 import click
 from envchain.chain import add_chain, get_chain, remove_chain, get_chain_names
 from envchain.export import export_chain
 from envchain.cli_audit import audit_group
 from envchain.cli_diff import diff_group
 from envchain.cli_snapshot import snapshot_group
+from envchain.cli_template import template_group
+from envchain.cli_history import history_group
+from envchain.cli_pin import pin_group
 
 
 @click.group()
 def cli():
-    """envchain: manage encrypted per-project environment variable sets."""
+    """envchain — manage encrypted per-project environment variable sets."""
+    pass
 
 
 @cli.command()
-@click.argument("chain_name")
-@click.argument("password")
-@click.argument("env_vars", nargs=-1, required=True)
+@click.argument("name")
+@click.argument("envvars", nargs=-1, required=True)
 @click.option("--overwrite", is_flag=True, default=False)
-def add(chain_name, password, env_vars, overwrite):
-    """Add a new chain with KEY=VALUE pairs."""
-    variables = {}
-    for pair in env_vars:
-        if "=" not in pair:
-            raise click.BadParameter(f"Invalid format '{pair}', expected KEY=VALUE.")
-        k, v = pair.split("=", 1)
-        variables[k] = v
-    add_chain(chain_name, variables, password, overwrite=overwrite)
-    click.echo(f"Chain '{chain_name}' saved.")
+def add(name, envvars, overwrite):
+    """Add a chain with KEY=VALUE pairs."""
+    data = {}
+    for item in envvars:
+        if "=" not in item:
+            click.echo(f"Invalid format: '{item}'. Use KEY=VALUE.", err=True)
+            raise SystemExit(1)
+        k, v = item.split("=", 1)
+        data[k] = v
+    add_chain(name, data, overwrite=overwrite)
+    click.echo(f"Chain '{name}' saved.")
 
 
 @cli.command()
-@click.argument("chain_name")
-@click.argument("password")
-@click.option("--format", "fmt", default="bash", type=click.Choice(["bash", "fish", "dotenv"]), show_default=True)
-@click.option("--export", "do_export", is_flag=True, default=False)
-def get(chain_name, password, fmt, do_export):
-    """Get and display variables for a chain."""
+@click.argument("name")
+@click.option("--export", "fmt", default=None, type=click.Choice(["bash", "fish", "dotenv"]))
+def get(name, fmt):
+    """Get a chain's variables."""
     try:
-        if do_export:
-            output = export_chain(chain_name, password, fmt)
-            click.echo(output)
+        if fmt:
+            click.echo(export_chain(name, fmt))
         else:
-            variables = get_chain(chain_name, password)
-            for k, v in variables.items():
+            chain = get_chain(name)
+            for k, v in chain.items():
                 click.echo(f"{k}={v}")
-    except Exception as e:
-        raise click.ClickException(str(e))
+    except KeyError:
+        click.echo(f"Chain '{name}' not found.", err=True)
+        raise SystemExit(1)
 
 
 @cli.command()
-@click.argument("chain_name")
-@click.argument("password")
-def remove(chain_name, password):
+@click.argument("name")
+def remove(name):
     """Remove a chain."""
     try:
-        remove_chain(chain_name, password)
-        click.echo(f"Chain '{chain_name}' removed.")
-    except Exception as e:
-        raise click.ClickException(str(e))
+        remove_chain(name)
+        click.echo(f"Chain '{name}' removed.")
+    except KeyError:
+        click.echo(f"Chain '{name}' not found.", err=True)
+        raise SystemExit(1)
 
 
 @cli.command(name="list")
 def list_chains():
-    """List all available chains."""
+    """List all chains."""
     names = get_chain_names()
     if not names:
         click.echo("No chains found.")
     else:
-        for name in names:
-            click.echo(name)
+        for n in names:
+            click.echo(n)
 
 
 cli.add_command(audit_group)
 cli.add_command(diff_group)
 cli.add_command(snapshot_group)
+cli.add_command(template_group)
+cli.add_command(history_group)
+cli.add_command(pin_group)
