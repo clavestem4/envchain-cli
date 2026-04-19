@@ -24,11 +24,22 @@ def decompress_chain(blob: str, password: str, new_name: str = None, overwrite: 
         compressed = base64.urlsafe_b64decode(blob.encode("ascii"))
         payload = gzip.decompress(compressed)
         data = json.loads(payload.decode("utf-8"))
+    except CompressError:
+        raise
+    except gzip.BadGzipFile as e:
+        raise CompressError(f"Blob is not valid gzip data: {e}") from e
+    except (ValueError, KeyError) as e:
+        raise CompressError(f"Blob contains invalid JSON structure: {e}") from e
     except Exception as e:
         raise CompressError(f"Failed to decompress blob: {e}") from e
 
-    chain_name = new_name or data["name"]
-    vars_ = data["vars"]
+    chain_name = new_name or data.get("name")
+    if not chain_name:
+        raise CompressError("Blob is missing required 'name' field and no new_name provided.")
+
+    vars_ = data.get("vars")
+    if vars_ is None:
+        raise CompressError("Blob is missing required 'vars' field.")
 
     try:
         existing = get_chain(chain_name, password)
