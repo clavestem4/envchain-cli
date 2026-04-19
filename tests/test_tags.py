@@ -41,12 +41,29 @@ def test_add_tag_no_duplicates(mock_chain_fns):
     assert tags_raw.count("production") == 1
 
 
+def test_add_multiple_tags(mock_chain_fns):
+    """Adding multiple distinct tags should all be retained."""
+    add_tag("mychain", "production", PASSWORD)
+    add_tag("mychain", "staging", PASSWORD)
+    tags = get_tags("mychain", PASSWORD)
+    assert "production" in tags
+    assert "staging" in tags
+
+
 def test_remove_tag(mock_chain_fns):
     mock_chain_fns["mychain"][TAGS_KEY] = "production,staging"
     remove_tag("mychain", "production", PASSWORD)
     tags_raw = mock_chain_fns["mychain"][TAGS_KEY]
     assert "production" not in tags_raw
     assert "staging" in tags_raw
+
+
+def test_remove_nonexistent_tag(mock_chain_fns):
+    """Removing a tag that doesn't exist should not raise and leave tags unchanged."""
+    mock_chain_fns["mychain"][TAGS_KEY] = "staging"
+    remove_tag("mychain", "production", PASSWORD)
+    tags = get_tags("mychain", PASSWORD)
+    assert tags == ["staging"]
 
 
 def test_get_tags_empty(mock_chain_fns):
