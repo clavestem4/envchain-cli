@@ -32,3 +32,15 @@ def get_chain_names(store_path=None):
     """List all stored chain names."""
     kwargs = {"store_path": store_path} if store_path else {}
     return list_chains(**kwargs)
+
+
+def update_chain(chain_name: str, variables: Dict[str, str], password: str, store_path=None) -> None:
+    """Update an existing chain by merging new variables into it.
+
+    Decrypts the existing chain, merges the provided variables (overwriting
+    any keys that already exist), then re-encrypts and saves the result.
+    Raises KeyError if the chain does not exist.
+    """
+    existing = get_chain(chain_name, password, store_path=store_path)
+    existing.update(variables)
+    add_chain(chain_name, existing, password, store_path=store_path)
