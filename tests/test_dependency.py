@@ -75,3 +75,12 @@ def test_resolve_order_circular_raises(mock_fns):
 
 def test_get_dependencies_none_set(mock_fns):
     assert get_dependencies("cache", "pw") == []
+
+
+def test_resolve_order_transitive_deps(mock_fns):
+    """Ensure transitive dependencies are ordered correctly (cache -> db -> app)."""
+    set_dependencies("app", ["db"], "pw")
+    set_dependencies("db", ["cache"], "pw")
+    order = resolve_order(["app", "db", "cache"], "pw")
+    assert order.index("cache") < order.index("db")
+    assert order.index("db") < order.index("app")
