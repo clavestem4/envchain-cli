@@ -57,3 +57,27 @@ def decompress_chain(blob: str, password: str, new_name: str = None, overwrite: 
 def compressed_size(blob: str) -> int:
     """Return byte size of the compressed blob."""
     return len(base64.urlsafe_b64decode(blob.encode("ascii")))
+
+
+def inspect_blob(blob: str) -> dict:
+    """Decode a compressed blob and return its metadata without importing it.
+
+    Returns a dict with 'name', 'var_count', and 'compressed_bytes' keys.
+    Raises CompressError if the blob cannot be decoded or is structurally invalid.
+    """
+    try:
+        compressed = base64.urlsafe_b64decode(blob.encode("ascii"))
+        payload = gzip.decompress(compressed)
+        data = json.loads(payload.decode("utf-8"))
+    except gzip.BadGzipFile as e:
+        raise CompressError(f"Blob is not valid gzip data: {e}") from e
+    except (ValueError, KeyError) as e:
+        raise CompressError(f"Blob contains invalid JSON structure: {e}") from e
+    except Exception as e:
+        raise CompressError(f"Failed to decode blob: {e}") from e
+
+    return {
+        "name": data.get("name"),
+        "var_count": len(data.get("vars") or {}),
+        "compressed_bytes": len(compressed),
+    }
