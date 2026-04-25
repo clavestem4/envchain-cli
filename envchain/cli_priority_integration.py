@@ -42,3 +42,20 @@ def merge_by_priority(password: str) -> dict:
     for _name, variables in reversed(chains):
         merged.update(variables)
     return merged
+
+
+def find_chain_for_key(key: str, password: str) -> str | None:
+    """Find the highest-priority chain that defines a given key.
+
+    Args:
+        key: The environment variable name to search for.
+        password: Master password.
+
+    Returns:
+        The name of the highest-priority chain containing the key,
+        or None if no chain defines it.
+    """
+    for name, variables in get_chains_by_priority(password, exclude_meta=True):
+        if key in variables:
+            return name
+    return None
