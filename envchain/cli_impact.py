@@ -1,4 +1,4 @@
-"""CLI commands for managing impact levels of environment chains."""
+"""CLI commands for managing impact levels on chains."""
 
 import click
 from envchain.impact import (
@@ -15,18 +15,20 @@ VALID_LEVELS = ["none", "low", "medium", "high", "critical"]
 
 @click.group(name="impact")
 def impact_group():
-    """Manage impact levels for environment chains."""
+    """Manage impact levels for chains."""
 
 
 @impact_group.command(name="set")
 @click.argument("chain_name")
 @click.argument("level", type=click.Choice(VALID_LEVELS, case_sensitive=False))
-@click.option("--password", prompt=True, hide_input=True, help="Encryption password.")
-def impact_set(chain_name: str, level: str, password: str):
+@click.option("--reason", "-r", default=None, help="Optional reason for this impact level.")
+def impact_set(chain_name: str, level: str, reason: str):
     """Set the impact level for a chain."""
     try:
-        set_impact(chain_name, level.lower(), password)
+        set_impact(chain_name, level.lower(), reason=reason)
         click.echo(f"Impact level for '{chain_name}' set to '{level.lower()}'.")
+        if reason:
+            click.echo(f"Reason: {reason}")
     except ImpactError as e:
         click.echo(f"Error: {e}", err=True)
         raise SystemExit(1)
@@ -34,15 +36,18 @@ def impact_set(chain_name: str, level: str, password: str):
 
 @impact_group.command(name="get")
 @click.argument("chain_name")
-@click.option("--password", prompt=True, hide_input=True, help="Encryption password.")
-def impact_get(chain_name: str, password: str):
+def impact_get(chain_name: str):
     """Get the impact level for a chain."""
     try:
-        level = get_impact(chain_name, password)
-        if level:
-            click.echo(f"{chain_name}: {level}")
+        info = get_impact(chain_name)
+        if info is None:
+            click.echo(f"No impact level set for '{chain_name}'.")
         else:
-            click.echo(f"{chain_name}: (no impact level set)")
+            level = info.get("level", "unknown")
+            reason = info.get("reason")
+            click.echo(f"Impact: {level}")
+            if reason:
+                click.echo(f"Reason: {reason}")
     except ImpactError as e:
         click.echo(f"Error: {e}", err=True)
         raise SystemExit(1)
@@ -50,11 +55,10 @@ def impact_get(chain_name: str, password: str):
 
 @impact_group.command(name="clear")
 @click.argument("chain_name")
-@click.option("--password", prompt=True, hide_input=True, help="Encryption password.")
-def impact_clear(chain_name: str, password: str):
+def impact_clear(chain_name: str):
     """Clear the impact level for a chain."""
     try:
-        clear_impact(chain_name, password)
+        clear_impact(chain_name)
         click.echo(f"Impact level cleared for '{chain_name}'.")
     except ImpactError as e:
         click.echo(f"Error: {e}", err=True)
@@ -64,20 +68,50 @@ def impact_clear(chain_name: str, password: str):
 @impact_group.command(name="list")
 @click.option(
     "--level",
+    "-l",
     type=click.Choice(VALID_LEVELS, case_sensitive=False),
     default=None,
     help="Filter by impact level.",
 )
-@click.option("--password", prompt=True, hide_input=True, help="Encryption password.")
-def impact_list(level: str, password: str):
-    """List chains grouped by or filtered by impact level."""
+def impact_list(level: str):
+    """List chains grouped by impact level (or filtered by level)."""
     try:
-        results = list_by_impact(password, filter_level=level.lower() if level else None)
-        if not results:
-            click.echo("No chains with impact levels found.")
+        all_names = get_chain_names()
+        if not all_names:
+            click.echo("No chains found.")
             return
-        for chain_name, chain_level in sorted(results.items(), key=lambda x: VALID_LEVELS.index(x[1])):
-            click.echo(f"{chain_name}: {chain_level}")
+
+        if level:
+            chains = list_by_impact(level.lower())
+            if not chains:
+                click.echo(f"No chains with impact level '{level}'.")
+            else:
+                click.echo(f"Chains with impact '{level}':")
+                for name in chains:
+                    click.echo(f"  - {name}")
+        else:
+            # Group all chains by their impact level
+            grouped: dict[str, list[str]] = {lvl: [] for lvl in VALID_LEVELS}
+            unset = []
+            for name in all_names:
+                info = get_impact(name)
+                if info is None:
+                    unset.append(name)
+                else:
+                    lvl = info.get("level", "none")
+                    grouped.setdefault(lvl, []).append(name)
+
+            for lvl in VALID_LEVELS:
+                chains_in_level = grouped.get(lvl, [])
+                if chains_in_level:
+                    click.echo(f"[{lvl}]")
+                    for name in chains_in_level:
+                        click.echo(f"  - {name}")
+
+            if unset:
+                click.echo("[unset]")
+                for name in unset:
+                    click.echo(f"  - {name}")
     except ImpactError as e:
         click.echo(f"Error: {e}", err=True)
         raise SystemExit(1)
